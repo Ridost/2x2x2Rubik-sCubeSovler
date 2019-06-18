@@ -3,8 +3,20 @@
 #include "stdafx.h"
 #endif
 
+map<string, string> reverse_map = {
+    {"R ", "R'"},
+    {"R", "R'"},
+    {"R'", "R "},
+    {"U ", "U'"},
+    {"U", "U'"},
+    {"U'", "U "},
+    {"B ", "B'"},
+    {"B", "B'"},
+    {"B'", "B "},
+};
+
 template <class T>
-void spinswap(T &a, T &b, T &c, T &d)
+void spinswap(T &a, T &b, T &c, T &d) // swapping a cube's content
 {
     T tmp = a;
     a = b;
@@ -13,16 +25,16 @@ void spinswap(T &a, T &b, T &c, T &d)
     d = tmp;
 }
 
-struct corner
+struct corner // indicates each corner block
 {
     string sides = "YBRGOW";
 };
 
-struct cube
+struct cube // a rubiks' cube
 {
     corner block[8];
 
-    string transform[6] = {"R", "R'", "U", "U'", "B", "B'"};
+    string transform[6] = {"R ", "R'", "U ", "U'", "B ", "B'"};
 
     int turns[3][4] = {
         {1, 3, 7, 5}, // R
@@ -125,6 +137,8 @@ struct cube
                 rotate_one(4);
             }
             break;
+        default:
+            cout << "Didn't rotate.";
         }
     }
 
@@ -137,4 +151,27 @@ struct cube
         }
         return true;
     }
+
+    void copy(cube f){
+        for (int i=0; i<8; i++){
+            block[i].sides = f.block[i].sides;
+        }
+    }
 };
+
+string reverse(string f) // reverse an instruction
+{
+    return reverse_map[f];
+}
+
+string cube_status(cube f)
+{
+    string tmp;
+
+    for (int i = 0; i < 8; i++)
+    {  
+        tmp.append(f.block[i].sides);
+    }
+
+    return tmp;
+}
