@@ -2,6 +2,7 @@
 #include<string>
 #include<fstream>
 #include<math.h>
+#include<queue>
 #include<pthread.h>
 
 using namespace std;
@@ -9,9 +10,9 @@ using namespace std;
 //
 void initial_pruning_table();
 int base6(int);
-pthread_mutex_t mutex;
-size_t size = 0x10000;
-pthread_attr_t tattr;
+pthread_mutex_t mutex=PTHREAD_MUTEX_INITIALIZER;
+
+
 string ShortestPath = "                     ";
 string Rtable[6] = {"R ","R'","U ","U'","B ","B'"};
 void Rotate_U(char *cube[],bool direction);
@@ -252,134 +253,88 @@ bool verification(char *temp_cube[])
 
 
 void *Solve(void * arg){
-    int steps = (int)arg;
-    int temp = steps;
-    //cout<<steps<<endl;
-    string log="";
-    for(int i=0;i<8;i++){
-        switch(temp%10){
-            case 1: log+="R ";break;
-            case 2: log+="R'";break;
-            case 3: log+="U ";break;
-            case 4: log+="U'";break;
-            case 5: log+="B ";break;
-            case 6: log+="B'";break;
-        }
-        temp/=10;
-        if(temp==0)    break;
-    }
-    //cout<<log<<endl;
-    if(log.length()>=ShortestPath.length()) pthread_exit(0);              //Get out
-    char **cube = new char*[6];
-    for(int i=0;i<6;i++){
-        cube[i] = new char[4];
+	//cout<<(long long)arg<<endl;
+	string ans=Rtable[(long long)arg];	//useful
+	char **t_cube;						//each thread own one cube
+	t_cube = new char*[6];				//initnail thread cube
+	for(int i=0;i<6;i++){
+        t_cube[i] = new char[4];
     }
     for(int i=0;i<6;i++){
         for(int j=0;j<4;j++){
-            cube[i][j] = origin_cube[i][j];
+            t_cube[i][j] = origin_cube[i][j];
         }
     }
 
-    for(int i=0;i<log.length();i+=2){                           // rotate cube
-        string input = log.substr(i,2);
-        if(input!="x"){
+	if (verification(t_cube)) {ShortestPath="";pthread_exit(0);}
 
-			if(input[0]=='U'){
-				if(input[1]=='\'')Rotate_U(cube,1);
-				else if(input[1]=='2'){Rotate_U(cube,0);Rotate_U(cube,0);}
-                else Rotate_U(cube,0);
+	queue <string>path;					//the solution optional queue
+	path.push(ans);
+	while (1)
+	{
+		string tans=path.front();		//current solution
+		//cout<<tans<<endl;
+		pthread_mutex_lock(&)
+		if(ShortestPath.length() <= tans.length() )		// length > current shortest path =>break
+			break;		
+		
+		for(int i=0;i<tans.length();i+=2)
+		{
+			if(tans[i]=='R'){
+				if(tans[i+1]=='\'')Rotate_R(t_cube,1);
+				else Rotate_R(t_cube,0);
 			}
-			else if(input[0]=='R'){
-				if(input[1]=='\'')Rotate_R(cube,1);
-				else if(input[1]=='2'){Rotate_R(cube,0);Rotate_R(cube,0);}
-                else Rotate_R(cube,0);
+			else if(tans[i]=='U'){
+				if(tans[i+1]=='\'')Rotate_U(t_cube,1);
+				else Rotate_U(t_cube,0);
 			}
-			else if(input[0]=='B'){
-				if(input[1]=='\'')Rotate_B(cube,1);
-				else if(input[1]=='2'){Rotate_B(cube,0);Rotate_B(cube,0);}
-                else Rotate_B(cube,0);
+			else if(tans[i]=='B'){
+				if(tans[i+1]=='\'') Rotate_B(t_cube,1);
+				else Rotate_B(t_cube,0);
 			}
-			else{
-				printf("Error\n");
-				break;}
-        }
-    }
-    if( verification(cube) ){                               // Solve Complete
-        //cout<<log.length()<<" "<<ShortestPath.length()<<endl;
-        pthread_mutex_lock(&mutex);
-        if(log.length()<ShortestPath.length()){
-                ShortestPath = log;  // Update ShortestPath
-        }
-        pthread_mutex_unlock(&mutex);
-        for(int i=0;i<6;i++)
-            delete[] cube[i];
-        delete[] cube;                                        // free memory resource
-        pthread_exit(0);
-    }
-    else{
-        string status="";
-        for(int i=0;i<6;i++){
-            for(int j=0;j<4;j++){
-                status += cube[i][j];
-            }
-        }
-        for(int i=0;i<6;i++)
-            delete[] cube[i];
-        delete[] cube;
-        if(log.length()==16){
-            //cout<<log.length()<<endl;                               // depth 8
-            for(int i=0;i<=6;i++){
-                ifstream fin;
-                string filename = "Prune_Table"+to_string(i)+".txt";
-                //cout<<filename<<endl;
-                fin.open(filename);
-                string input;
-                while(getline(fin,input)){
-                    if(input.substr(12,24)==status){                            // find
-                        log += input.substr(0,input.find("  "));
-                        pthread_mutex_lock(&mutex);
-                        if(log.length()<ShortestPath.length())   ShortestPath = log;  // Update ShortestPath
-                        pthread_mutex_unlock(&mutex);
-                        fin.close();
-                        pthread_exit(0);
-                    }
-                }
-                fin.close();
-            }
-            pthread_exit(0);                                                 // not found
-        }
-        else{                       // depth 1~7
+		}
+		
+		if(verification(t_cube)) {		
+			pthread_mutex_lock(&mutex);	
+				if(ShortestPath.length()>tans.length()){
+					ShortestPath=tans;
+					printcube(t_cube);
+				}
+			pthread_mutex_unlock(&mutex);
+			pthread_exit(0);
+		}
+		else
+		{
+			for(int i=0;i<6;i++){
+        		for(int j=0;j<4;j++){
+            	t_cube[i][j] = origin_cube[i][j];
+        		}
+    		}
+		}
+		
 
-            pthread_t tid[6];
-            bool busy[6] ={false,false,false,false,false,false};
-            /*for(int i=0;i<6;i++){
-                cout<<busy[i];
-            }*/
-            int arg=0,temp=steps;
-            int count =0;
-            do{count++;}while(temp/=10);
-            for(int i=0;i<6;i++){
-                arg = steps+(i+1)*pow(count,10);
-                //cout<<arg<<endl;
-                int len = log.length();
-                if(len>=4){
-                    if(Rtable[i]==log.substr(len-2,2) && Rtable[i]==log.substr(len-4,2)) continue;    //3 similar
-                    else if (Rtable[i]==counter(log.substr(len-2,2)))   continue;                   // counterwise
-                }
-                //cout<<i<<" "<<arg<<endl;
-                pthread_create(&tid[i],&tattr,Solve,(void*)arg);
-                busy[i]=true;
-            }
-            for(int i=0;i<=6;i++){
-                if(busy[i]==true) {
-                        //cout<<i<<" join"<<endl;
-                        pthread_join(tid[i],NULL);
-                        //cout<<i<<" release"<<endl;
-                }
-            }
-            pthread_exit(0);
-        }
-    }
+		for(int i=0;i<6;i++)
+		{	
+			//cout<<"i="<<i<<endl;
+			//cout<<"Sub:"<<tans.substr(tans.length()-2,2)<<endl;
+
+			if (tans.substr(tans.length()-2,2)==counter(Rtable[i]))
+				continue;
+			if (tans.length()!=2){
+			 	if( (tans.substr(tans.length()-4,2)==tans.substr(tans.length()-2,2)) && 
+				 	((tans.substr(tans.length()-2,2))==Rtable[i]) )
+				{
+					continue;
+				}
+			}
+			//cout<<"Before:"<<tans<<endl;
+			tans+=Rtable[i];
+			//cout<<"After:"<<tans<<endl;
+			path.push(tans);
+			tans=path.front();
+		}	
+		path.pop();
+	}	
 }
 
 int main(){
@@ -396,7 +351,7 @@ int main(){
 	int count=0;
 	//printcube(origin_cube);
 
-	cout<<"Enter Serial Rotate(enter to run)： ";
+	cout<<"Enter Serial Rotate(enter to run) : ";
 	getline(cin,inputstr);
 	while(1)
 	{
@@ -434,26 +389,27 @@ int main(){
 	}
 
 	printcube(origin_cube);
-    pthread_t tid;
+
+    pthread_t tid[6];
+
     int arg = 0;
-    pthread_mutex_init(&mutex,NULL);
+	for(int i=0;i<6;i++)
+	{
+		pthread_create(&tid[i],NULL,Solve,(void *)i);
+	}
+	for(int i=0;i<6;i++)
+	{
+		pthread_join(tid[i],NULL);
+	}
 
-    if (pthread_attr_init(&tattr) != 0) {
-    fprintf(stderr, "pthread_attr_init() failed\n");
-    }
-    if (pthread_attr_setstacksize(&tattr,size) != 0) {
-    fprintf(stderr, "pthread_attr_stacksize() failed\n");
-    }
-    pthread_create(&tid,&tattr,Solve,(void*)arg);
-    pthread_join(tid,NULL);
-    cout<<ShortestPath<<endl;
+    if(ShortestPath.length()>0){
+		cout<<"Finish! Find "<<ShortestPath.length()/2<<" steps solution"<<endl;
+    	cout<<"Solve step: "<<ShortestPath<<endl;
+	}
+	else{
+		cout<<"You don't need this solver!!"<<endl;
+	}
 	//cout<<verification(origin_cube);
-
-	//cout<< base6(155555);
-
-//用main遞迴創建pthread找最短解法
-
-//pthread 每步找出所有可能轉法，並再開thread下去找最短解法
 
 
 	//system("pause");
