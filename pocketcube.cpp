@@ -2,26 +2,26 @@
 #include<string>
 #include<fstream>
 #include<math.h>
+#include<pthread.h>
 
 using namespace std;
 
 //
 void initial_pruning_table();
 int base6(int);
-void Rotate_U(char cube[6][4],bool direction);
-void Rotate_R(char cube[6][4],bool direction);
-void Rotate_B(char cube[6][4],bool direction);
+pthread_mutex_t mutex;
+size_t size = 0x10000;
+pthread_attr_t tattr;
+string ShortestPath = "                     ";
+string Rtable[6] = {"R ","R'","U ","U'","B ","B'"};
+void Rotate_U(char *cube[],bool direction);
+void Rotate_R(char *cube[],bool direction);
+void Rotate_B(char *cube[],bool direction);
 
 
 
-char origin_cube[6][4]={
-	{'0','0','0','0'},
-	{'1','1','1','1'},
-	{'2','2','2','2'},
-	{'3','3','3','3'},
-	{'4','4','4','4'},
-	{'5','5','5','5'}
-};
+char **origin_cube;
+
 
 /*
 	order = U->L->F->R->B->D
@@ -49,6 +49,7 @@ char origin_cube[6][4]={
 	Rotate_R : U->B(0&2)->D->F->B(0&2) (Layer 1 3)
     Rotate_R': U<-B(0&2)<-D<-F<-B(0&2) (Layer 1 3)
 */
+/*
 char counter(char num){
 	switch (num){
 		case '0':	num = '1'; break;
@@ -59,332 +60,18 @@ char counter(char num){
 		case '5':	num = '4'; break;
 	}
 	return num;
+}*/
+string counter(string num){
+       if(num=="R ") num = "R'";
+        else if(num=="R'") num = "R ";
+        else if(num=="U ") num = "U'";
+        else if(num=="U'") num = "U ";
+        else if(num=="B ") num = "B'";
+        else if(num=="B'") num = "B ";
+
+    return num;
 }
-void initial_pruning_table_five()
-{
-	string Rtable[6] = {"R ","R'","U ","U'","B ","B'"};
-	int i=-1;
-	ofstream fout;
-	fout.open("Prune_table_five.txt");
-
-	while(1){
-		i=base6(i);
-		if(i==55555)break;      // operation length
-		string Rnum = to_string((long long)i);
-		Rnum.insert(Rnum.begin(),5-Rnum.length(),'0');  // 補0到operation length
-		//非連續三個重複
-		if((Rnum[0]==Rnum[1] && Rnum[0]==Rnum[2]) || (Rnum[1]==Rnum[2] && Rnum[1]==Rnum[3]) ||
-			(Rnum[2]==Rnum[3] && Rnum[2]==Rnum[4]))    //判斷到 Rnum[operation length]
-			continue;
-		//非正逆
-		bool counterwise = 0;
-		for(int i2=0;i2<4;i2++){    //判斷到 operation length-1
-			if(Rnum[i2]==counter(Rnum[i2+1]))	counterwise = 1;
-		}
-		if(counterwise==1)	continue;
-
-		string ch;
-		for(int j=0;j<5;j++){       //到 operation length
-			ch=Rtable[(Rnum[j])-48];
-			fout<<ch;
-		}
-		fout<<"  ";     //補空格到 12 char
-		char t_cube[6][4]={
-			{'0','0','0','0'},
-			{'1','1','1','1'},
-			{'2','2','2','2'},
-			{'3','3','3','3'},
-			{'4','4','4','4'},
-			{'5','5','5','5'}
-		};
-		for(int j=4;j>=0;j--)
-		{
-			string input;
-			Rnum[j]=counter(Rnum[j]);
-			input=Rtable[Rnum[j]-48];
-			if(input!="x"){
-
-			if(input[0]=='U'){
-				if(input[1]=='\'')Rotate_U(t_cube,1);
-				else if(input[1]=='2'){Rotate_U(t_cube,0);Rotate_U(t_cube,0);}
-				else Rotate_U(t_cube,0);
-			}
-			else if(input[0]=='R'){
-				if(input[1]=='\'')Rotate_R(t_cube,1);
-				else if(input[1]=='2'){Rotate_R(t_cube,0);Rotate_R(t_cube,0);}
-				else Rotate_R(t_cube,0);
-			}
-			else if(input[0]=='B'){
-				if(input[1]=='\'')Rotate_B(t_cube,1);
-				else if(input[1]=='2'){Rotate_B(t_cube,0);Rotate_B(t_cube,0);}
-				else Rotate_B(t_cube,0);
-			}
-			else{
-				printf("Error\n");
-				break;}
-		}
-		else break;
-		}
-		for(int j=0;j<6;j++)
-		{
-			fout.put(t_cube[j][0]);
-			fout.put(t_cube[j][1]);
-			fout.put(t_cube[j][2]);
-			fout.put(t_cube[j][3]);
-		}
-		fout<<endl;
-	}
-	fout.close();
-}
-void initial_pruning_table_four()
-{
-	string Rtable[6] = {"R ","R'","U ","U'","B ","B'"};
-	int i=-1;
-	ofstream fout;
-	fout.open("Prune_table_four.txt");
-
-	while(1){
-		i=base6(i);
-		if(i==5555)break;      // operation length
-		string Rnum = to_string((long long)i);
-		Rnum.insert(Rnum.begin(),4-Rnum.length(),'0');  // 補0到operation length
-		//非連續三個重複
-		if((Rnum[0]==Rnum[1] && Rnum[0]==Rnum[2]) || (Rnum[1]==Rnum[2] && Rnum[1]==Rnum[3]))    //判斷到 Rnum[operation length]
-			continue;
-		//非正逆
-		bool counterwise = 0;
-		for(int i2=0;i2<3;i2++){    //判斷到 operation length-1
-			if(Rnum[i2]==counter(Rnum[i2+1]))	counterwise = 1;
-		}
-		if(counterwise==1)	continue;
-
-		string ch;
-		for(int j=0;j<4;j++){       //到 operation length
-			ch=Rtable[(Rnum[j])-48];
-			fout<<ch;
-		}
-		fout<<"    ";     //補空格到 12 char
-		char t_cube[6][4]={
-			{'0','0','0','0'},
-			{'1','1','1','1'},
-			{'2','2','2','2'},
-			{'3','3','3','3'},
-			{'4','4','4','4'},
-			{'5','5','5','5'}
-		};
-		for(int j=3;j>=0;j--)
-		{
-			string input;
-			Rnum[j]=counter(Rnum[j]);
-			input=Rtable[Rnum[j]-48];
-			if(input!="x"){
-
-			if(input[0]=='U'){
-				if(input[1]=='\'')Rotate_U(t_cube,1);
-				else if(input[1]=='2'){Rotate_U(t_cube,0);Rotate_U(t_cube,0);}
-				else Rotate_U(t_cube,0);
-			}
-			else if(input[0]=='R'){
-				if(input[1]=='\'')Rotate_R(t_cube,1);
-				else if(input[1]=='2'){Rotate_R(t_cube,0);Rotate_R(t_cube,0);}
-				else Rotate_R(t_cube,0);
-			}
-			else if(input[0]=='B'){
-				if(input[1]=='\'')Rotate_B(t_cube,1);
-				else if(input[1]=='2'){Rotate_B(t_cube,0);Rotate_B(t_cube,0);}
-				else Rotate_B(t_cube,0);
-			}
-			else{
-				printf("Error\n");
-				break;}
-		}
-		else break;
-		}
-		for(int j=0;j<6;j++)
-		{
-			fout.put(t_cube[j][0]);
-			fout.put(t_cube[j][1]);
-			fout.put(t_cube[j][2]);
-			fout.put(t_cube[j][3]);
-		}
-		fout<<endl;
-	}
-	fout.close();
-}
-void initial_pruning_table_one()
-{
-	string Rtable[6] = {"R ","R'","U ","U'","B ","B'"};
-	int i=-1;
-	ofstream fout;
-	fout.open("Prune_table_one.txt");
-
-	while(1){
-		i=base6(i);
-		if(i==10)break;      // operation length
-		string Rnum = to_string((long long)i);
-		//Rnum.insert(Rnum.begin(),1-Rnum.length(),'0');  // 補0到operation length
-		//非連續三個重複
-		/*
-		if((Rnum[0]==Rnum[1] && Rnum[0]==Rnum[2]) || (Rnum[1]==Rnum[2] && Rnum[1]==Rnum[3]) ||
-			(Rnum[2]==Rnum[3] && Rnum[2]==Rnum[4]))    //判斷到 Rnum[operation length]
-			continue;
-		//非正逆
-		bool counterwise = 0;
-		for(int i2=0;i2<4;i2++){    //判斷到 operation length-1
-			if(Rnum[i2]==counter(Rnum[i2+1]))	counterwise = 1;
-		}
-		if(counterwise==1)	continue;
-        */
-		string ch;
-		for(int j=0;j<1;j++){       //到 operation length
-			ch=Rtable[(Rnum[j])-48];
-			fout<<ch;
-		}
-		fout<<"          ";     //補空格到 12 char
-		char t_cube[6][4]={
-			{'0','0','0','0'},
-			{'1','1','1','1'},
-			{'2','2','2','2'},
-			{'3','3','3','3'},
-			{'4','4','4','4'},
-			{'5','5','5','5'}
-		};
-		for(int j=0;j>=0;j--)
-		{
-			string input;
-			Rnum[j]=counter(Rnum[j]);
-			input=Rtable[Rnum[j]-48];
-			if(input!="x"){
-
-			if(input[0]=='U'){
-				if(input[1]=='\'')Rotate_U(t_cube,1);
-				else if(input[1]=='2'){Rotate_U(t_cube,0);Rotate_U(t_cube,0);}
-				else Rotate_U(t_cube,0);
-			}
-			else if(input[0]=='R'){
-				if(input[1]=='\'')Rotate_R(t_cube,1);
-				else if(input[1]=='2'){Rotate_R(t_cube,0);Rotate_R(t_cube,0);}
-				else Rotate_R(t_cube,0);
-			}
-			else if(input[0]=='B'){
-				if(input[1]=='\'')Rotate_B(t_cube,1);
-				else if(input[1]=='2'){Rotate_B(t_cube,0);Rotate_B(t_cube,0);}
-				else Rotate_B(t_cube,0);
-			}
-			else{
-				printf("Error\n");
-				break;}
-		}
-		else break;
-		}
-		for(int j=0;j<6;j++)
-		{
-			fout.put(t_cube[j][0]);
-			fout.put(t_cube[j][1]);
-			fout.put(t_cube[j][2]);
-			fout.put(t_cube[j][3]);
-		}
-		fout<<endl;
-	}
-	fout.close();
-}
-void initial_pruning_table()
-{
-	string Rtable[6] = {"R ","R'","U ","U'","B ","B'"};
-	int i=-1;
-	ofstream fout;
-	fout.open("Prune_table.txt");
-
-	while(1){
-		i=base6(i);
-		if(i==555555)break;
-		string Rnum = to_string((long long)i);
-		Rnum.insert(Rnum.begin(),6-Rnum.length(),'0');
-		//非連續三個重複
-		if((Rnum[0]==Rnum[1] && Rnum[0]==Rnum[2]) || (Rnum[1]==Rnum[2] && Rnum[1]==Rnum[3]) ||
-			(Rnum[2]==Rnum[3] && Rnum[2]==Rnum[4]) ||(Rnum[3]==Rnum[4] && Rnum[3]==Rnum[5]))
-			continue;
-		//非正逆
-		bool counterwise = 0;
-		for(int i2=0;i2<5;i2++){
-			if(Rnum[i2]==counter(Rnum[i2+1]))	counterwise = 1;
-		}
-		if(counterwise==1)	continue;
-
-		string ch;
-		for(int j=0;j<6;j++){
-			ch=Rtable[(Rnum[j])-48];
-			fout<<ch;
-		}
-		char t_cube[6][4]={
-			{'0','0','0','0'},
-			{'1','1','1','1'},
-			{'2','2','2','2'},
-			{'3','3','3','3'},
-			{'4','4','4','4'},
-			{'5','5','5','5'}
-		};
-		for(int j=5;j>=0;j--)
-		{
-			string input;
-			Rnum[j]=counter(Rnum[j]);
-			input=Rtable[Rnum[j]-48];
-			if(input!="x"){
-
-			if(input[0]=='U'){
-				if(input[1]=='\'')Rotate_U(t_cube,1);
-				else if(input[1]=='2'){Rotate_U(t_cube,0);Rotate_U(t_cube,0);}
-				else Rotate_U(t_cube,0);
-			}
-			else if(input[0]=='R'){
-				if(input[1]=='\'')Rotate_R(t_cube,1);
-				else if(input[1]=='2'){Rotate_R(t_cube,0);Rotate_R(t_cube,0);}
-				else Rotate_R(t_cube,0);
-			}
-			else if(input[0]=='B'){
-				if(input[1]=='\'')Rotate_B(t_cube,1);
-				else if(input[1]=='2'){Rotate_B(t_cube,0);Rotate_B(t_cube,0);}
-				else Rotate_B(t_cube,0);
-			}
-			else{
-				printf("Error\n");
-				break;}
-		}
-		else break;
-		}
-		for(int j=0;j<6;j++)
-		{
-			fout.put(t_cube[j][0]);
-			fout.put(t_cube[j][1]);
-			fout.put(t_cube[j][2]);
-			fout.put(t_cube[j][3]);
-		}
-		fout<<endl;
-	}
-	fout.close();
-}
-int base6(int in_num)
-{
-    //cout<<in_num<<" ";
-	//in_num=000000
-	int out_num=0,temp,i;
-	temp=in_num+1;
-	for(i=0;i<6;i++)
-	{
-		if(temp%10==6){
-			temp = (temp/10)+1;
-		}
-		else{
-			out_num+=(int)round(((temp%10)*(pow((double)10,(double)i))));
-			//cout<<out_num<<": "<<(temp%10)<<"  "<<pow(10,(double)i)<<"  result :"<<(temp%10)*(pow((double)10,(double)i))<<endl;
-			temp/=10;
-		}
-	}
-    //cout<<(5%10)*(int)(pow((double)10,(double)2))<<endl;
-	return out_num;
-}
-
-void Rotate_U(char cube[6][4],bool direction)
+void Rotate_U(char *cube[],bool direction)
 {
 	//dic=0->clockwise dic=1->counter-clockwise
 	char temp_0=0,temp_1=0;
@@ -425,7 +112,7 @@ void Rotate_U(char cube[6][4],bool direction)
 	}
 }
 
-void Rotate_R(char cube[6][4],bool direction)
+void Rotate_R(char *cube[],bool direction)
 {
 	//dic=0->clockwise dic=1->counter-clockwise
 	char temp_0=0,temp_1=0;
@@ -477,7 +164,7 @@ void Rotate_R(char cube[6][4],bool direction)
 	}
 }
 
-void Rotate_B(char cube[6][4],bool direction)
+void Rotate_B(char *cube[],bool direction)
 {
 	//dic=0->clockwise dic=1->counter-clockwise
 	char temp_0=0,temp_1=0;
@@ -529,7 +216,7 @@ void Rotate_B(char cube[6][4],bool direction)
 	}
 }
 
-void printcube(char cube[6][4])
+void printcube(char *cube[])
 {
 	int i,j;
 	printf("     %c %c \n",cube[0][0],cube[0][1]);
@@ -553,7 +240,7 @@ void printcube(char cube[6][4])
 	printf("     %c %c \n\n",cube[5][2],cube[5][3]);
 }
 
-bool verification(char temp_cube[6][4])
+bool verification(char *temp_cube[])
 {
 	bool ver=false;
 	if (temp_cube[0][0]==temp_cube[0][1] && temp_cube[0][0]==temp_cube[0][2] && temp_cube[0][0]==temp_cube[0][3])
@@ -563,27 +250,152 @@ bool verification(char temp_cube[6][4])
 	return ver;
 }
 
-//int tc0[6][4],tc1[6][4],tc2[6][4],tc3[6][4],tc4[6][4],tc5[6][4];
 
-void bfs_solver()
-{
-	int i;
-	for(i=0;i<6;i++)
-	{
+void *Solve(void * arg){
+    int steps = (int)arg;
+    int temp = steps;
+    //cout<<steps<<endl;
+    string log="";
+    for(int i=0;i<8;i++){
+        switch(temp%10){
+            case 1: log+="R ";break;
+            case 2: log+="R'";break;
+            case 3: log+="U ";break;
+            case 4: log+="U'";break;
+            case 5: log+="B ";break;
+            case 6: log+="B'";break;
+        }
+        temp/=10;
+        if(temp==0)    break;
+    }
+    //cout<<log<<endl;
+    if(log.length()>=ShortestPath.length()) pthread_exit(0);              //Get out
+    char **cube = new char*[6];
+    for(int i=0;i<6;i++){
+        cube[i] = new char[4];
+    }
+    for(int i=0;i<6;i++){
+        for(int j=0;j<4;j++){
+            cube[i][j] = origin_cube[i][j];
+        }
+    }
 
-	}
+    for(int i=0;i<log.length();i+=2){                           // rotate cube
+        string input = log.substr(i,2);
+        if(input!="x"){
 
+			if(input[0]=='U'){
+				if(input[1]=='\'')Rotate_U(cube,1);
+				else if(input[1]=='2'){Rotate_U(cube,0);Rotate_U(cube,0);}
+                else Rotate_U(cube,0);
+			}
+			else if(input[0]=='R'){
+				if(input[1]=='\'')Rotate_R(cube,1);
+				else if(input[1]=='2'){Rotate_R(cube,0);Rotate_R(cube,0);}
+                else Rotate_R(cube,0);
+			}
+			else if(input[0]=='B'){
+				if(input[1]=='\'')Rotate_B(cube,1);
+				else if(input[1]=='2'){Rotate_B(cube,0);Rotate_B(cube,0);}
+                else Rotate_B(cube,0);
+			}
+			else{
+				printf("Error\n");
+				break;}
+        }
+    }
+    if( verification(cube) ){                               // Solve Complete
+        //cout<<log.length()<<" "<<ShortestPath.length()<<endl;
+        pthread_mutex_lock(&mutex);
+        if(log.length()<ShortestPath.length()){
+                ShortestPath = log;  // Update ShortestPath
+        }
+        pthread_mutex_unlock(&mutex);
+        for(int i=0;i<6;i++)
+            delete[] cube[i];
+        delete[] cube;                                        // free memory resource
+        pthread_exit(0);
+    }
+    else{
+        string status="";
+        for(int i=0;i<6;i++){
+            for(int j=0;j<4;j++){
+                status += cube[i][j];
+            }
+        }
+        for(int i=0;i<6;i++)
+            delete[] cube[i];
+        delete[] cube;
+        if(log.length()==16){
+            //cout<<log.length()<<endl;                               // depth 8
+            for(int i=0;i<=6;i++){
+                ifstream fin;
+                string filename = "Prune_Table"+to_string(i)+".txt";
+                //cout<<filename<<endl;
+                fin.open(filename);
+                string input;
+                while(getline(fin,input)){
+                    if(input.substr(12,24)==status){                            // find
+                        log += input.substr(0,input.find("  "));
+                        pthread_mutex_lock(&mutex);
+                        if(log.length()<ShortestPath.length())   ShortestPath = log;  // Update ShortestPath
+                        pthread_mutex_unlock(&mutex);
+                        fin.close();
+                        pthread_exit(0);
+                    }
+                }
+                fin.close();
+            }
+            pthread_exit(0);                                                 // not found
+        }
+        else{                       // depth 1~7
 
-
+            pthread_t tid[6];
+            bool busy[6] ={false,false,false,false,false,false};
+            /*for(int i=0;i<6;i++){
+                cout<<busy[i];
+            }*/
+            int arg=0,temp=steps;
+            int count =0;
+            do{count++;}while(temp/=10);
+            for(int i=0;i<6;i++){
+                arg = steps+(i+1)*pow(count,10);
+                //cout<<arg<<endl;
+                int len = log.length();
+                if(len>=4){
+                    if(Rtable[i]==log.substr(len-2,2) && Rtable[i]==log.substr(len-4,2)) continue;    //3 similar
+                    else if (Rtable[i]==counter(log.substr(len-2,2)))   continue;                   // counterwise
+                }
+                //cout<<i<<" "<<arg<<endl;
+                pthread_create(&tid[i],&tattr,Solve,(void*)arg);
+                busy[i]=true;
+            }
+            for(int i=0;i<=6;i++){
+                if(busy[i]==true) {
+                        //cout<<i<<" join"<<endl;
+                        pthread_join(tid[i],NULL);
+                        //cout<<i<<" release"<<endl;
+                }
+            }
+            pthread_exit(0);
+        }
+    }
 }
 
-
-
 int main(){
+    origin_cube = new char*[6];
+    for(int i=0;i<6;i++){
+        origin_cube[i] = new char[4];
+    }
+    for(int i=0;i<6;i++){
+        for(int j=0;j<4;j++){
+            origin_cube[i][j] = i+48;
+        }
+    }
 	string inputstr;
 	int count=0;
-
 	//printcube(origin_cube);
+
 	cout<<"Enter Serial Rotate(enter to run)： ";
 	getline(cin,inputstr);
 	while(1)
@@ -622,14 +434,28 @@ int main(){
 	}
 
 	printcube(origin_cube);
+    pthread_t tid;
+    int arg = 0;
+    pthread_mutex_init(&mutex,NULL);
+
+    if (pthread_attr_init(&tattr) != 0) {
+    fprintf(stderr, "pthread_attr_init() failed\n");
+    }
+    if (pthread_attr_setstacksize(&tattr,size) != 0) {
+    fprintf(stderr, "pthread_attr_stacksize() failed\n");
+    }
+    pthread_create(&tid,&tattr,Solve,(void*)arg);
+    pthread_join(tid,NULL);
+    cout<<ShortestPath<<endl;
 	//cout<<verification(origin_cube);
 
 	//cout<< base6(155555);
 
 //用main遞迴創建pthread找最短解法
+
 //pthread 每步找出所有可能轉法，並再開thread下去找最短解法
 
 
 	//system("pause");
-
+    return 0;
 }
