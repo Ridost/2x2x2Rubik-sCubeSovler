@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 
+
 using namespace std;
 
 //
@@ -254,9 +255,9 @@ bool verification(char *temp_cube[])
 }
 
 
-void *Solve(void * arg){
+void Solve(){
 	//cout<<(long long)arg<<endl;
-	string ans=Rtable[(long long)arg];	//useful
+
 	char **t_cube;						//each thread own one cube
 	t_cube = new char*[6];				//initnail thread cube
 	for(int i=0;i<6;i++){
@@ -268,18 +269,18 @@ void *Solve(void * arg){
         }
     }
 
-	if (verification(t_cube)) {ShortestPath="";pthread_exit(0);}
+	if (verification(t_cube)) {ShortestPath="";}
 
-	queue <string>path;									//the solution optional queue
-	path.push(ans);
+	queue <string>path;	
+    for(int i=0;i<6;i++)								//the solution optional queue
+	    path.push(Rtable[i]);
 	while (1)
 	{
 		string tans=path.front();						//current solution
 		//cout<<tans<<endl;
-		pthread_rwlock_rdlock(&rwlock);
 		if(ShortestPath.length() <= tans.length() )		// length > current shortest path =>break
 			break;		
-		pthread_rwlock_unlock(&rwlock);
+
 		for(int i=0;i<tans.length();i+=2)
 		{
 			if(tans[i]=='R'){
@@ -296,14 +297,12 @@ void *Solve(void * arg){
 			}
 		}
 		
-		if(verification(t_cube)) {		
-			pthread_mutex_lock(&mutex);	
-				if(ShortestPath.length()>tans.length()){
-					ShortestPath=tans;
-					printcube(t_cube);
-				}
-			pthread_mutex_unlock(&mutex);
-			pthread_exit(0);
+		if(verification(t_cube)) {	
+			if(ShortestPath.length()>tans.length()){
+				ShortestPath=tans;
+				printcube(t_cube);
+			}
+            break;
 		}
 		else
 		{
@@ -340,6 +339,7 @@ void *Solve(void * arg){
 }
 
 int main(){
+
     origin_cube = new char*[6];
     for(int i=0;i<6;i++){
         origin_cube[i] = new char[4];
@@ -392,22 +392,13 @@ int main(){
 
 	printcube(origin_cube);
 
-    pthread_t tid[6];
-
-	double start_utime,end_utime;
+    double start_utime,end_utime;
     struct timeval tv, tv2;
     gettimeofday(&tv,NULL);  
     start_utime = tv.tv_sec * 1000000 + tv.tv_usec;
 
-    int arg = 0;
-	for(int i=0;i<6;i++)
-	{
-		pthread_create(&tid[i],NULL,Solve,(void *)i);
-	}
-	for(int i=0;i<6;i++)
-	{
-		pthread_join(tid[i],NULL);
-	}
+    Solve();
+
 
     if(ShortestPath.length()>0){
 		cout<<"Finish! Find "<<ShortestPath.length()/2<<" steps solution"<<endl;
